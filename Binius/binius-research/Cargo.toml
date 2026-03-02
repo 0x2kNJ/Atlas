@@ -2,23 +2,51 @@
 members = ["envelope-circuits", "wasm-prover"]
 resolver = "2"
 
+# ─── Binius dependency configuration ─────────────────────────────────────────
+#
+# The binius64 library is from Irreducible Labs:
+#   https://github.com/IrreducibleOSS/binius
+#
+# TWO WAYS TO USE THIS WORKSPACE:
+#
+# A) Git source (recommended — always up to date):
+#    Uses [workspace.dependencies] below with git = "..." entries.
+#    Run: cargo build --release
+#
+# B) Local path (for development on the binius source):
+#    Clone binius to a local directory, then override with:
+#      BINIUS_PATH=/path/to/binius cargo build --release
+#    Or set path = "/path/to/binius/crates/..." in each dep below.
+#
+# The original implementation used a local checkout at /tmp/binius64-patched.
+# This workspace now uses the upstream git source instead.
+# If you need the exact patched version, clone and point BINIUS_PATH at it.
+#
+# API compatibility note:
+#   This workspace uses the binius-frontend CircuitBuilder API introduced in
+#   the main branch around early 2025. If you get compile errors about missing
+#   CircuitBuilder, make sure you are on a recent commit of the main branch.
+
 [workspace.dependencies]
-# Binius64 — full-featured (rayon + CLMUL enabled, NOT the SP1-patched version)
-binius-core       = { path = "/tmp/binius64-patched/crates/core" }
-binius-circuits   = { path = "/tmp/binius64-patched/crates/circuits" }
-binius-examples   = { path = "/tmp/binius64-patched/crates/examples" }
-binius-frontend   = { path = "/tmp/binius64-patched/crates/frontend" }
-binius-prover     = { path = "/tmp/binius64-patched/crates/prover" }
-binius-verifier   = { path = "/tmp/binius64-patched/crates/verifier" }
-binius-hash       = { path = "/tmp/binius64-patched/crates/hash" }
-binius-transcript = { path = "/tmp/binius64-patched/crates/transcript" }
-binius-utils      = { path = "/tmp/binius64-patched/crates/utils" }
+# ── Binius crates (upstream git) ─────────────────────────────────────────────
+binius-core       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-core" }
+binius-circuits   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-circuits" }
+binius-examples   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-examples" }
+binius-frontend   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-frontend" }
+binius-prover     = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-prover" }
+binius-verifier   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-verifier" }
+binius-hash       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-hash" }
+binius-transcript = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-transcript" }
+binius-utils      = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-utils" }
+binius-field      = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-field" }
+binius-math       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-math" }
+binius-ip         = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-ip" }
 
-binius-field      = { path = "/tmp/binius64-patched/crates/field" }
-binius-math       = { path = "/tmp/binius64-patched/crates/math" }
-binius-ip         = { path = "/tmp/binius64-patched/crates/ip" }
+# ── If you need to pin to a specific commit (e.g. for reproducible builds): ──
+# binius-core = { git = "https://github.com/IrreducibleOSS/binius", rev = "COMMIT_HASH", package = "binius-core" }
+
+# ── Other dependencies ────────────────────────────────────────────────────────
 itertools         = "0.13"
-
 anyhow  = "1"
 sha2    = "0.10"
 digest  = "0.10"

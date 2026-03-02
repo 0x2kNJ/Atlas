@@ -23,17 +23,17 @@ serde-wasm-bindgen = "0.6"
 # getrandom must opt-in to the JS entropy source for wasm32
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
-# Binius crates — default-features = false everywhere to strip rayon
-binius-core       = { path = "/tmp/binius64-patched/crates/core" }
-binius-field      = { path = "/tmp/binius64-patched/crates/field" }
-binius-math       = { path = "/tmp/binius64-patched/crates/math" }
-binius-frontend   = { path = "/tmp/binius64-patched/crates/frontend" }
-binius-circuits   = { path = "/tmp/binius64-patched/crates/circuits" }
-binius-hash       = { path = "/tmp/binius64-patched/crates/hash",     default-features = false }
-binius-prover     = { path = "/tmp/binius64-patched/crates/prover",   default-features = false }
-binius-verifier   = { path = "/tmp/binius64-patched/crates/verifier", default-features = false }
-binius-transcript = { path = "/tmp/binius64-patched/crates/transcript" }
-binius-utils      = { path = "/tmp/binius64-patched/crates/utils" }
+# Binius crates — default-features = false everywhere to strip rayon for WASM
+binius-core       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-core" }
+binius-field      = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-field" }
+binius-math       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-math" }
+binius-frontend   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-frontend" }
+binius-circuits   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-circuits" }
+binius-hash       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-hash",     default-features = false }
+binius-prover     = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-prover",   default-features = false }
+binius-verifier   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-verifier", default-features = false }
+binius-transcript = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-transcript" }
+binius-utils      = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-utils" }
 
 # The envelope circuits crate — disable the "native" feature so binius-examples
 # (which pulls in ureq/ring/ethsign) is not compiled for WASM.

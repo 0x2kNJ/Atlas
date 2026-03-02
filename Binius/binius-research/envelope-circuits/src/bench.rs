@@ -25,6 +25,7 @@ use binius_core::constraint_system::ValueVec;
 use binius_transcript::{ProverTranscript, VerifierTranscript};
 use binius_verifier::config::StdChallenger;
 use envelope_circuits::{
+    compliance::{ComplianceCircuit, ComplianceInstance, MAX_N},
     encumber::{EncumberCircuit, EncumberInstance},
     settle::SettleCircuit,
     spend::SpendCircuit,
@@ -45,25 +46,26 @@ fn main() -> Result<()> {
 
     println!("Binius64 Envelope Circuit Benchmarks");
     println!("log_inv_rate = {}  (rate = 1/{})", log_inv_rate, 1u32 << log_inv_rate);
-    println!("Hash: DoubleSha256 (SHA256²) — divide by ~1.5 for single-SHA256 estimate");
-    println!("Merkle depth: 20  |  Prove runs: {} (median reported)\n", N_PROVE_RUNS);
+    println!("Hash: DoubleSha256 (SHA256²)");
+    println!("Prove runs: {} (median reported)\n", N_PROVE_RUNS);
 
     println!(
-        "{:<16} | {:>10} | {:>10} | {:>10} | {:>12} | {:>8}",
+        "{:<24} | {:>10} | {:>10} | {:>10} | {:>12} | {:>8}",
         "Circuit", "Setup", "Prove", "Verify", "Proof size", "SHA256 rds"
     );
-    println!("{}", "-".repeat(78));
+    println!("{}", "-".repeat(90));
 
     bench_encumber(log_inv_rate)?;
     bench_spend(log_inv_rate)?;
     bench_settle(log_inv_rate)?;
+    bench_compliance(log_inv_rate, MAX_N)?;
 
     println!("\nNotes:");
     println!("  Setup   = one-time key collection (cache with KeyCollection for production)");
     println!("  Prove   = per-proof wall-clock (median of {} runs)", N_PROVE_RUNS);
     println!("  Verify  = verifier time (before SP1 wrapping, happens on relay server)");
-    println!("  Single-SHA256 estimate ≈ Prove × 2/3  (DoubleSha256 is ~1.5× more rounds)");
-    println!("  Production circuits use Poseidon2 not SHA256 — see zk_envelopes_protocol_v3.md");
+    println!("  Compliance: N={} active receipts, DoubleSHA256 rolling root chain", MAX_N);
+    println!("  SHA256 rounds: 4 per receipt (3 inner for 160B + 1 outer) × {} = {}", MAX_N, 4 * MAX_N);
 
     Ok(())
 }
@@ -130,10 +132,57 @@ fn bench_encumber(log_inv_rate: usize) -> Result<()> {
     let verify_time = verify_and_time(&verifier, witness.public(), last_proof)?;
 
     println!(
-        "{:<16} | {:>10} | {:>10} | {:>10} | {:>9} KB | {:>8}",
+        "{:<24} | {:>10} | {:>10} | {:>10} | {:>9} KB | {:>8}",
         "Encumber",
         format_dur(setup_time), format_dur(prove_median), format_dur(verify_time),
         proof_size / 1024, 66,
+    );
+    Ok(())
+}
+
+fn bench_compliance(log_inv_rate: usize, n_active: usize) -> Result<()> {
+    let label = format!("Compliance (N={})", n_active);
+
+    // Build circuit
+    let mut builder = CircuitBuilder::new();
+    let circuit = ComplianceCircuit::build(&mut builder);
+    let built = builder.build();
+    let cs = built.constraint_system().clone();
+
+    // Setup (one-time)
+    let t_setup = Instant::now();
+    let (verifier, prover) = setup_sha256(cs, log_inv_rate, None)?;
+    let setup_time = t_setup.elapsed();
+
+    // Populate witness
+    let inst = ComplianceInstance::test_instance(n_active);
+    let mut filler = built.new_witness_filler();
+    circuit.populate(&mut filler, &inst);
+    built.populate_wire_witness(&mut filler)?;
+    let witness = filler.into_value_vec();
+
+    // Prove N times, take median
+    let mut prove_times = Vec::new();
+    let mut proof_size = 0usize;
+    let mut last_proof = Vec::new();
+    for _ in 0..N_PROVE_RUNS {
+        let (t, proof) = prove_and_time(&prover, witness.clone())?;
+        proof_size = proof.len();
+        last_proof = proof;
+        prove_times.push(t);
+    }
+    prove_times.sort();
+    let prove_median = prove_times[N_PROVE_RUNS / 2];
+
+    // Verify
+    let verify_time = verify_and_time(&verifier, witness.public(), last_proof)?;
+
+    let sha256_rounds = 4 * MAX_N; // 4 rounds per receipt × MAX_N slots
+    println!(
+        "{:<24} | {:>10} | {:>10} | {:>10} | {:>9} KB | {:>8}",
+        label,
+        format_dur(setup_time), format_dur(prove_median), format_dur(verify_time),
+        proof_size / 1024, sha256_rounds,
     );
     Ok(())
 }
@@ -171,7 +220,7 @@ fn bench_spend(log_inv_rate: usize) -> Result<()> {
     let verify_time = verify_and_time(&verifier, witness.public(), last_proof)?;
 
     println!(
-        "{:<16} | {:>10} | {:>10} | {:>10} | {:>9} KB | {:>8}",
+        "{:<24} | {:>10} | {:>10} | {:>10} | {:>9} KB | {:>8}",
         "Spend",
         format_dur(setup_time), format_dur(prove_times[N_PROVE_RUNS / 2]), format_dur(verify_time),
         proof_size / 1024, 69,
@@ -212,7 +261,7 @@ fn bench_settle(log_inv_rate: usize) -> Result<()> {
     let verify_time = verify_and_time(&verifier, witness.public(), last_proof)?;
 
     println!(
-        "{:<16} | {:>10} | {:>10} | {:>10} | {:>9} KB | {:>8}",
+        "{:<24} | {:>10} | {:>10} | {:>10} | {:>9} KB | {:>8}",
         "Settle",
         format_dur(setup_time), format_dur(prove_times[N_PROVE_RUNS / 2]), format_dur(verify_time),
         proof_size / 1024, 69,

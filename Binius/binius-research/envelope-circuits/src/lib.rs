@@ -12,6 +12,7 @@
 //   - All circuits use the ExampleCircuit pattern for consistent benchmarking
 
 pub mod common;
+pub mod compliance;
 pub mod encumber;
 pub mod settle;
 pub mod spend;
