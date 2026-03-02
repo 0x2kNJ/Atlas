@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useAccount, useWalletClient, usePublicClient, useBalance } from "wagmi";
-import { encodeAbiParameters, toHex, parseUnits } from "viem";
+import { toHex, parseUnits } from "viem";
 
 import { ADDRESSES, ANVIL_CHAIN_ID } from "./contracts/addresses";
 import {
@@ -8,9 +8,9 @@ import {
   CLAWLOAN_POOL_ABI,
   VAULT_ABI,
   REGISTRY_ABI,
-  CREDIT_VERIFIER_ABI,
-  ACCUMULATOR_ABI,
 } from "./contracts/abis";
+import { triggerEnvelope }   from "./lib/triggerEnvelope";
+import { submitCreditProof as runCreditProof } from "./lib/creditProof";
 import { useChainState } from "./hooks/useChainState";
 import { StatusBar }          from "./components/StatusBar";
 import { StepCard }           from "./components/StepCard";
@@ -66,7 +66,6 @@ import type { Position, Capability, Intent, Conditions } from "@atlas-protocol/s
 const BOT_ID       = 1n;
 const BORROW_AMT   = parseUnits("500", 6);   // 500 USDC
 const EARNINGS_AMT = parseUnits("1000", 6);  // 1,000 USDC (agent task earnings)
-const DEBT_CAP     = parseUnits("510", 6);   // 510 USDC cap (allows for interest)
 const LOAN_WINDOW  = 7 * 24 * 60 * 60;      // 7 days in seconds
 
 // ─── BigInt-safe localStorage serialization ──────────────────────────────────
@@ -207,7 +206,7 @@ function AgentModeApp() {
   const [keeperFeeEarned,   setKeeperFeeEarned]   = useState<bigint>(0n);
   const [triggerTx,         setTriggerTx]         = useState<string | undefined>();
   const [tierUpgrade,       setTierUpgrade]       = useState<{ from: number; to: number } | null>(null);
-  const prevTierRef                                = useRef<number>(0);
+  const prevTierRef = useRef<number>(0);
 
   const chain = useChainState(demo.positionHash, demo.envelopeHash, demo.capabilityHash);
 
@@ -218,8 +217,6 @@ function AgentModeApp() {
     }
     prevTierRef.current = chain.creditTier;
   }, [chain.creditTier]);
-
-  void DEBT_CAP; // reference to avoid unused-variable lint warning
 
   // ── Auto-airdrop on wallet connect ───────────────────────────────────────────
   const { data: ethBalance } = useBalance({ address });
@@ -613,152 +610,42 @@ function AgentModeApp() {
   // ── Step 4: keeper trigger ───────────────────────────────────────────────────
   async function keeperTrigger() {
     await withBusy("trigger", async () => {
-      if (!walletClient || !demo.envelopeHash || !demo.conditions || !demo.position || !demo.intent || !demo.spendCap || !demo.capSig || !demo.intentSig) {
+      if (!walletClient || !address || !demo.envelopeHash || !demo.conditions || !demo.position || !demo.intent || !demo.spendCap || !demo.capSig || !demo.intentSig) {
         throw new Error("complete step 3 first");
       }
-
-      log("info", "Keeper: checking condition (block.timestamp > loanDeadline)…");
-
-      // Warp time on Anvil past the deadline.
-      // Use max(latestBlock.timestamp + 1, deadline + 1) so repeated calls never
-      // try to set a timestamp that is ≤ the chain's current tip.
-      const deadline   = demo.loanDeadline ?? 0n;
-      const latestBlock = await publicClient!.getBlock({ blockTag: "latest" });
-      const minTs      = latestBlock.timestamp + 1n;
-      const targetTs   = deadline + 1n > minTs ? deadline + 1n : minTs;
-      await publicClient!.request({
-        method: "evm_setNextBlockTimestamp" as never,
-        params: [toHex(targetTs)] as never,
+      const { triggerTx: tx, feeEarned } = await triggerEnvelope({
+        publicClient: publicClient!,
+        walletClient,
+        address,
+        envelopeHash:  demo.envelopeHash,
+        conditions:    demo.conditions,
+        position:      demo.position,
+        intent:        demo.intent,
+        spendCap:      demo.spendCap,
+        capSig:        demo.capSig,
+        intentSig:     demo.intentSig,
+        loanDeadline:  demo.loanDeadline ?? 0n,
+        positionAmount: EARNINGS_AMT,
+        keeperRewardBps: 10n,
+        log,
       });
-      await publicClient!.request({ method: "evm_mine" as never, params: [] as never });
-      log("info", `Warped to ${new Date(Number(targetTs) * 1000).toLocaleString()} — condition now met`);
-
-      log("info", `Triggering envelope ${demo.envelopeHash.slice(0, 14)}…`);
-
-      // Guard: check the envelope is still Active on this chain before doing anything.
-      // If state is stale (e.g. from before a chain restart), give a clear message.
-      const envelopeActive = await publicClient!.readContract({
-        address: ADDRESSES.EnvelopeRegistry as `0x${string}`,
-        abi: REGISTRY_ABI,
-        functionName: "isActive",
-        args: [demo.envelopeHash],
-      }) as boolean;
-      if (!envelopeActive) {
-        throw new Error(
-          "Envelope not found or already triggered on this chain.\n" +
-          "Hard-refresh the browser (Cmd+Shift+R) then redo steps 2–4 (deposit → register → trigger)."
-        );
-      }
-
-      try {
-        await publicClient!.simulateContract({
-          address: ADDRESSES.EnvelopeRegistry as `0x${string}`,
-          abi: REGISTRY_ABI,
-          functionName: "trigger",
-          args: [
-            demo.envelopeHash,
-            demo.conditions as never,
-            demo.position   as never,
-            demo.intent     as never,
-            demo.spendCap   as never,
-            demo.capSig,
-            demo.intentSig,
-          ],
-          account: address,
-        });
-      } catch (simErr: unknown) {
-        const msg = simErr instanceof Error ? simErr.message : String(simErr);
-        throw new Error(`Trigger simulation failed: ${msg.slice(0, 400)}`);
-      }
-
-      const hash = await walletClient.writeContract({
-        address: ADDRESSES.EnvelopeRegistry as `0x${string}`,
-        abi: REGISTRY_ABI,
-        functionName: "trigger",
-        args: [
-          demo.envelopeHash,
-          demo.conditions as never,
-          demo.position   as never,
-          demo.intent     as never,
-          demo.spendCap   as never,
-          demo.capSig,
-          demo.intentSig,
-        ],
-      });
-      const triggerReceipt = await publicClient!.waitForTransactionReceipt({ hash });
-      if (triggerReceipt.status === "reverted") {
-        throw new Error(`Trigger TX reverted: ${hash}`);
-      }
-
-      // Keeper fee = keeperRewardBps (10) / 10000 * position amount
-      const feeEarned = EARNINGS_AMT * 10n / 10000n;
       setKeeperFeeEarned(feeEarned);
-      setTriggerTx(hash);
-      log("success", `Loan repaid by keeper! tx ${hash.slice(0, 10)}…`);
-      log("success", `Keeper earned: ${(Number(feeEarned) / 1e6).toFixed(2)} USDC (0.1% of ${Number(EARNINGS_AMT) / 1e6} USDC position)`);
-      log("success", "Surplus returned to vault as new position — agent keeps the profit");
+      setTriggerTx(tx);
     });
   }
 
-  // ── Step 5: submit credit proof ─────────────────────────────────────────────
+  // ── Step 5: submit credit proof (real Binius64 proof) ───────────────────────
   async function submitCreditProof() {
     await withBusy("credit", async () => {
       if (!walletClient) throw new Error("wallet not connected");
-
-      // capabilityHash is the EIP-712 struct hash of the spend capability.
-      // It must match what CapabilityKernel passes to ReceiptAccumulator.accumulate().
-      const capHash = demo.capabilityHash;
-      if (!capHash) {
-        throw new Error("No capabilityHash — complete step 3 (register envelope) first");
-      }
-      log("info", `Reading receipts from accumulator (cap: ${capHash.slice(0, 12)}…)`);
-
-      const receiptHashes = await publicClient!.readContract({
-        address: ADDRESSES.ReceiptAccumulator as `0x${string}`,
-        abi: ACCUMULATOR_ABI,
-        functionName: "getReceiptHashes",
-        args: [capHash],
-      }) as `0x${string}`[];
-
-      const nullifiers = await publicClient!.readContract({
-        address: ADDRESSES.ReceiptAccumulator as `0x${string}`,
-        abi: ACCUMULATOR_ABI,
-        functionName: "getNullifiers",
-        args: [capHash],
-      }) as `0x${string}`[];
-
-      const n = BigInt(receiptHashes.length);
-      if (n === 0n) {
-        log("warn", `No receipts for cap ${capHash.slice(0, 12)}… — did the trigger TX actually execute the intent?`);
-        log("warn", "Check: is the capabilityHash correct? Open DevTools console and look for 'IntentExecuted' events.");
-        return;
-      }
-
-      const adapters   = Array(receiptHashes.length).fill(ADDRESSES.ClawloanRepayAdapter);
-      const amountsIn  = Array(receiptHashes.length).fill(EARNINGS_AMT);
-      const amountsOut = Array(receiptHashes.length).fill(parseUnits("3", 6));
-
-      const proof = encodeAbiParameters(
-        [
-          { type: "bytes32[]" },
-          { type: "bytes32[]" },
-          { type: "address[]" },
-          { type: "uint256[]" },
-          { type: "uint256[]" },
-        ],
-        [receiptHashes, nullifiers, adapters as `0x${string}`[], amountsIn, amountsOut]
-      );
-
-      log("info", `Submitting Circuit 1 proof for ${n} receipt(s)…`);
-      const hash = await walletClient.writeContract({
-        address: ADDRESSES.CreditVerifier as `0x${string}`,
-        abi: CREDIT_VERIFIER_ABI,
-        functionName: "submitProof",
-        args: [capHash, n, ADDRESSES.ClawloanRepayAdapter as `0x${string}`, 0n, proof],
+      if (!demo.capabilityHash) throw new Error("No capabilityHash — complete step 3 first");
+      await runCreditProof({
+        publicClient:   publicClient!,
+        walletClient,
+        capabilityHash: demo.capabilityHash,
+        adapterAddr:    ADDRESSES.ClawloanRepayAdapter as `0x${string}`,
+        log,
       });
-      await publicClient!.waitForTransactionReceipt({ hash });
-      log("success", `Credit proof verified — tx ${hash.slice(0, 10)}…`);
-      log("success", "Credit tier upgraded! Click 'New cycle →' to run again.");
     });
   }
 
@@ -774,142 +661,52 @@ function AgentModeApp() {
   }
 
   // ── Auto-simulate: trigger + credit proof in one click ───────────────────────
-  // Calls the same inner logic as keeperTrigger and submitCreditProof but in sequence,
-  // sharing one busy lock so UI doesn't double-spin.
   async function autoSimulate() {
     await withBusy("simulate", async () => {
-      if (!walletClient || !demo.envelopeHash || !demo.conditions || !demo.position || !demo.intent || !demo.spendCap || !demo.capSig || !demo.intentSig) {
+      if (!walletClient || !address || !demo.envelopeHash || !demo.conditions || !demo.position || !demo.intent || !demo.spendCap || !demo.capSig || !demo.intentSig) {
         throw new Error("complete step 3 first");
       }
 
-      // ── Trigger (skip if position already spent by a parallel click) ─────────
-      const latestBlockBefore = await publicClient!.getBlock({ blockTag: "latest" });
+      // Skip the trigger if the position was already spent by a parallel click.
+      const positionKey = (demo.positionHash ?? "0x" + "0".repeat(64)) as `0x${string}`;
       const posAlreadySpent = !(await publicClient!.readContract({
         address: ADDRESSES.SingletonVault as `0x${string}`,
         abi: VAULT_ABI,
         functionName: "positionExists",
-        args: [demo.position.salt !== undefined
-          ? (demo.positionHash as `0x${string}`)
-          : "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`],
+        args: [positionKey],
       }) as boolean);
 
       if (posAlreadySpent) {
         log("info", "Position already spent (trigger ran in parallel) — skipping to credit proof…");
       } else {
-        log("info", "Auto-simulate: warping time past deadline…");
-        const deadline    = demo.loanDeadline ?? 0n;
-        const minTs       = latestBlockBefore.timestamp + 1n;
-        const targetTs    = deadline + 1n > minTs ? deadline + 1n : minTs;
-        await publicClient!.request({
-          method: "evm_setNextBlockTimestamp" as never,
-          params: [toHex(targetTs)] as never,
+        const { triggerTx: tx, feeEarned } = await triggerEnvelope({
+          publicClient:    publicClient!,
+          walletClient,
+          address,
+          envelopeHash:   demo.envelopeHash,
+          conditions:     demo.conditions,
+          position:       demo.position,
+          intent:         demo.intent,
+          spendCap:       demo.spendCap,
+          capSig:         demo.capSig,
+          intentSig:      demo.intentSig,
+          loanDeadline:   demo.loanDeadline ?? 0n,
+          positionAmount: EARNINGS_AMT,
+          keeperRewardBps: 10n,
+          log,
         });
-        await publicClient!.request({ method: "evm_mine" as never, params: [] as never });
-        log("info", `Warped to ${new Date(Number(targetTs) * 1000).toLocaleString()} — triggering envelope…`);
-
-        // Guard: verify envelope is active on this chain.
-        const envelopeActiveAuto = await publicClient!.readContract({
-          address: ADDRESSES.EnvelopeRegistry as `0x${string}`,
-          abi: REGISTRY_ABI,
-          functionName: "isActive",
-          args: [demo.envelopeHash],
-        }) as boolean;
-        if (!envelopeActiveAuto) {
-          throw new Error(
-            "Envelope not active on-chain (stale state?). Hard-refresh and redo from deposit."
-          );
-        }
-
-        // Simulate to get exact revert reason before sending.
-        try {
-          await publicClient!.simulateContract({
-            address: ADDRESSES.EnvelopeRegistry as `0x${string}`,
-            abi: REGISTRY_ABI,
-            functionName: "trigger",
-            args: [
-              demo.envelopeHash,
-              demo.conditions as never,
-              demo.position   as never,
-              demo.intent     as never,
-              demo.spendCap   as never,
-              demo.capSig,
-              demo.intentSig,
-            ],
-            account: address,
-          });
-        } catch (simErr: unknown) {
-          const msg = simErr instanceof Error ? simErr.message : String(simErr);
-          throw new Error(`Auto trigger simulation failed: ${msg.slice(0, 400)}`);
-        }
-
-        const autoTriggerHash = await walletClient.writeContract({
-          address: ADDRESSES.EnvelopeRegistry as `0x${string}`,
-          abi: REGISTRY_ABI,
-          functionName: "trigger",
-          args: [
-            demo.envelopeHash,
-            demo.conditions as never,
-            demo.position   as never,
-            demo.intent     as never,
-            demo.spendCap   as never,
-            demo.capSig,
-            demo.intentSig,
-          ],
-        });
-        const triggerReceipt = await publicClient!.waitForTransactionReceipt({ hash: autoTriggerHash });
-        if (triggerReceipt.status === "reverted") {
-          throw new Error(`Trigger TX reverted: ${autoTriggerHash}`);
-        }
-        const feeEarnedAuto = EARNINGS_AMT * 10n / 10000n;
-        setKeeperFeeEarned(feeEarnedAuto);
-        setTriggerTx(autoTriggerHash);
-        log("success", `Loan repaid by keeper! tx ${autoTriggerHash.slice(0, 10)}…`);
-        log("success", `Keeper earned: ${(Number(feeEarnedAuto) / 1e6).toFixed(2)} USDC (0.1% fee)`);
+        setKeeperFeeEarned(feeEarned);
+        setTriggerTx(tx);
       }
 
-      // ── Credit proof ─────────────────────────────────────────────────────────
       if (!demo.capabilityHash) { log("warn", "No capabilityHash — skipping credit proof"); return; }
-
-      log("info", "Reading receipts from accumulator…");
-      const receiptHashes = await publicClient!.readContract({
-        address: ADDRESSES.ReceiptAccumulator as `0x${string}`,
-        abi: ACCUMULATOR_ABI,
-        functionName: "getReceiptHashes",
-        args: [demo.capabilityHash as `0x${string}`],
-      }) as `0x${string}`[];
-
-      const nullifiers = await publicClient!.readContract({
-        address: ADDRESSES.ReceiptAccumulator as `0x${string}`,
-        abi: ACCUMULATOR_ABI,
-        functionName: "getNullifiers",
-        args: [demo.capabilityHash as `0x${string}`],
-      }) as `0x${string}`[];
-
-      const n = BigInt(receiptHashes.length);
-      if (n === 0n) { log("warn", "No receipts — trigger may have failed"); return; }
-
-      const adapters   = Array(receiptHashes.length).fill(ADDRESSES.ClawloanRepayAdapter);
-      const amountsIn  = Array(receiptHashes.length).fill(EARNINGS_AMT);
-      const amountsOut = Array(receiptHashes.length).fill(parseUnits("3", 6)); // approx profit
-
-      const proof = encodeAbiParameters(
-        [
-          { type: "bytes32[]" }, { type: "bytes32[]" },
-          { type: "address[]" }, { type: "uint256[]" }, { type: "uint256[]" },
-        ],
-        [receiptHashes, nullifiers, adapters as `0x${string}`[], amountsIn, amountsOut]
-      );
-
-      log("info", `Submitting Circuit 1 proof for ${n} receipt(s)…`);
-      const creditTx = await walletClient.writeContract({
-        address: ADDRESSES.CreditVerifier as `0x${string}`,
-        abi: CREDIT_VERIFIER_ABI,
-        functionName: "submitProof",
-        args: [demo.capabilityHash as `0x${string}`, n, ADDRESSES.ClawloanRepayAdapter as `0x${string}`, 0n, proof],
+      await runCreditProof({
+        publicClient:   publicClient!,
+        walletClient,
+        capabilityHash: demo.capabilityHash,
+        adapterAddr:    ADDRESSES.ClawloanRepayAdapter as `0x${string}`,
+        log,
       });
-      await publicClient!.waitForTransactionReceipt({ hash: creditTx });
-      log("success", `Credit proof verified — tx ${creditTx.slice(0, 10)}…`);
-      log("success", "Tier upgraded! Click 'New cycle →' to run again.");
     });
   }
 

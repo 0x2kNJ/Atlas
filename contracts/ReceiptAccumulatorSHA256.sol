@@ -27,7 +27,7 @@ import {IReceiptAccumulator} from "./interfaces/IReceiptAccumulator.sol";
 ///
 /// ─── Rolling root formula ────────────────────────────────────────────────────
 ///
-///   root_0 = bytes32(0)
+///   root_0 = capabilityHash   (matches the Binius64 compliance circuit)
 ///   root_i = sha256(prev_root ‖ index_le32 ‖ receiptHash ‖ nullifier ‖ adapter_padded)
 ///            [32B] prev  | [8B] index (uint64 LE) | [24B zero] | [32B] receipt | [32B] nf | [32B] adapter
 ///            = 160 bytes total — matches build_rolling_msg() in compliance.rs exactly.
@@ -179,9 +179,12 @@ contract ReceiptAccumulatorSHA256 is Ownable2Step, IReceiptAccumulator {
 
         uint256 idx = _receiptCount[capabilityHash];
 
-        // Per-capability rolling root using SHA-256 (Binius-compatible).
+        // root_0 = capabilityHash (matches Binius64 compliance circuit).
+        // On first accumulation the mapping default is bytes32(0); substitute capabilityHash.
+        bytes32 prevRoot = idx == 0 ? capabilityHash : _rollingRoot[capabilityHash];
+
         bytes32 newRoot = _sha256RollingStep(
-            _rollingRoot[capabilityHash],
+            prevRoot,
             idx,
             receiptHash,
             nullifier,
@@ -195,10 +198,13 @@ contract ReceiptAccumulatorSHA256 is Ownable2Step, IReceiptAccumulator {
         _nullifiers[capabilityHash].push(nullifier);
         _historicalRoots[capabilityHash].push(newRoot);
 
-        // H-3: per-adapter rolling root
+        // H-3: per-adapter rolling root (also starts from capabilityHash)
         uint256 adapterIdx = _adapterCount[capabilityHash][adapter] - 1;
+        bytes32 adapterPrev = adapterIdx == 0
+            ? capabilityHash
+            : _adapterRollingRoot[capabilityHash][adapter];
         bytes32 adapterNewRoot = _sha256RollingStep(
-            _adapterRollingRoot[capabilityHash][adapter],
+            adapterPrev,
             adapterIdx,
             receiptHash,
             nullifier,
@@ -238,7 +244,7 @@ contract ReceiptAccumulatorSHA256 is Ownable2Step, IReceiptAccumulator {
     function rootAtIndex(bytes32 capabilityHash, uint256 index)
         external view override returns (bytes32)
     {
-        if (index == 0) return bytes32(0);
+        if (index == 0) return capabilityHash;
         bytes32[] storage roots = _historicalRoots[capabilityHash];
         require(index <= roots.length, "ReceiptAccumulatorSHA256: index out of range");
         return roots[index - 1];
@@ -272,7 +278,7 @@ contract ReceiptAccumulatorSHA256 is Ownable2Step, IReceiptAccumulator {
     function adapterRootAtIndex(bytes32 capabilityHash, address adapter, uint256 index)
         external view override returns (bytes32)
     {
-        if (index == 0) return bytes32(0);
+        if (index == 0) return capabilityHash;
         bytes32[] storage roots = _adapterHistoricalRoots[capabilityHash][adapter];
         require(index <= roots.length, "ReceiptAccumulatorSHA256: adapter index out of range");
         return roots[index - 1];

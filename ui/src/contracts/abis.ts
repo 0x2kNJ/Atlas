@@ -150,6 +150,8 @@ export const ACCUMULATOR_ABI = [
   { name: "rootAtIndex",              type: "function", stateMutability: "view", inputs: [{ name: "capabilityHash", type: "bytes32" }, { name: "index", type: "uint256" }],                              outputs: [{ type: "bytes32" }] },
   { name: "getAdapterReceiptHashes",  type: "function", stateMutability: "view", inputs: [{ name: "capabilityHash", type: "bytes32" }, { name: "adapter", type: "address" }],                           outputs: [{ type: "bytes32[]" }] },
   { name: "getAdapterNullifiers",     type: "function", stateMutability: "view", inputs: [{ name: "capabilityHash", type: "bytes32" }, { name: "adapter", type: "address" }],                           outputs: [{ type: "bytes32[]" }] },
+  { name: "adapterRootAtIndex",       type: "function", stateMutability: "view", inputs: [{ name: "capabilityHash", type: "bytes32" }, { name: "adapter", type: "address" }, { name: "index", type: "uint256" }], outputs: [{ type: "bytes32" }] },
+  { name: "rollingRoot",              type: "function", stateMutability: "view", inputs: [{ name: "capabilityHash", type: "bytes32" }],                                                                  outputs: [{ type: "bytes32" }] },
 ] as const;
 
 // ─── Phase 2: DirectTransferAdapter ───────────────────────────────────────────

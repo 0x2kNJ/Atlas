@@ -75,3 +75,25 @@ export {
 } from "./adapters.js";
 
 export type { FeeTier } from "./adapters.js";
+
+// Binius64 prover
+export {
+  generateComplianceProof,
+} from "./prover.js";
+
+export type {
+  ReceiptInput,
+  ProverRequest,
+  ProverResult,
+  ProverError,
+  ProverResponse,
+} from "./prover.js";
+
+// Binius64 proof attestation
+export {
+  attestationHash,
+  signAttestation,
+  encodeProofForContract,
+} from "./attester.js";
+
+export type { AttestationInput } from "./attester.js";

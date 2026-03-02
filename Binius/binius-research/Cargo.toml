@@ -1,54 +1,39 @@
 [workspace]
-members = ["envelope-circuits", "wasm-prover"]
+members = ["envelope-circuits"]
 resolver = "2"
 
 # ─── Binius dependency configuration ─────────────────────────────────────────
 #
-# The binius64 library is from Irreducible Labs:
+# Uses the current upstream binius from Irreducible Labs:
 #   https://github.com/IrreducibleOSS/binius
 #
-# TWO WAYS TO USE THIS WORKSPACE:
-#
-# A) Git source (recommended — always up to date):
-#    Uses [workspace.dependencies] below with git = "..." entries.
-#    Run: cargo build --release
-#
-# B) Local path (for development on the binius source):
-#    Clone binius to a local directory, then override with:
-#      BINIUS_PATH=/path/to/binius cargo build --release
-#    Or set path = "/path/to/binius/crates/..." in each dep below.
-#
-# The original implementation used a local checkout at /tmp/binius64-patched.
-# This workspace now uses the upstream git source instead.
-# If you need the exact patched version, clone and point BINIUS_PATH at it.
-#
-# API compatibility note:
-#   This workspace uses the binius-frontend CircuitBuilder API introduced in
-#   the main branch around early 2025. If you get compile errors about missing
-#   CircuitBuilder, make sure you are on a recent commit of the main branch.
+# The m3 API is the current frontend. The old binius-frontend/binius-circuits
+# were removed from upstream in 2025.
 
 [workspace.dependencies]
-# ── Binius crates (upstream git) ─────────────────────────────────────────────
-binius-core       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-core" }
-binius-circuits   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-circuits" }
-binius-examples   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-examples" }
-binius-frontend   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-frontend" }
-binius-prover     = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-prover" }
-binius-verifier   = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-verifier" }
-binius-hash       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-hash" }
-binius-transcript = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-transcript" }
-binius-utils      = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-utils" }
-binius-field      = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-field" }
-binius-math       = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-math" }
-binius-ip         = { git = "https://github.com/IrreducibleOSS/binius", package = "binius-ip" }
+binius_core         = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_core", default-features = false }
+binius_compute      = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_compute", default-features = false }
+binius_fast_compute = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_fast_compute", default-features = false }
+binius_field        = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_field", default-features = false }
+binius_hal          = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_hal", default-features = false }
+binius_hash         = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_hash", default-features = false }
+binius_m3           = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_m3", default-features = false, features = ["test_utils"] }
+binius_macros       = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_macros", default-features = false }
+binius_math         = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_math", default-features = false }
+binius_utils        = { git = "https://github.com/IrreducibleOSS/binius", rev = "6e812cdc", package = "binius_utils", default-features = false }
 
-# ── If you need to pin to a specific commit (e.g. for reproducible builds): ──
-# binius-core = { git = "https://github.com/IrreducibleOSS/binius", rev = "COMMIT_HASH", package = "binius-core" }
-
-# ── Other dependencies ────────────────────────────────────────────────────────
-itertools         = "0.13"
 anyhow  = "1"
 sha2    = "0.10"
 digest  = "0.10"
+hex     = "0.4"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt"] }
+tracing-profile = "0.10.9"
+rand    = { version = "0.9.1", default-features = false, features = ["std", "std_rng", "thread_rng"] }
+bytesize = "2.0"
+clap    = { version = "4.5", features = ["derive"] }
+array-util = "1.0.2"
+bytemuck = { version = "1.18", features = ["derive", "min_const_generics", "must_cast"] }
+itertools = "0.14"
+
+[profile.release]
+lto = "thin"

@@ -90,11 +90,12 @@ import {
 ```ts
 import { signCapability, signManageCapability, signIntent } from "@atlas-protocol/sdk";
 
-// All three use EIP-712 typed data. signCapability and signManageCapability use the
-// kernel domain; signIntent uses the kernel domain with the Intent type.
-const capSig    = await signCapability(walletClient, chainId, kernelAddress, capability);
-const manageSig = await signManageCapability(walletClient, chainId, kernelAddress, manageCap);
-const intentSig = await signIntent(walletClient, chainId, kernelAddress, intent);
+// All three produce EIP-712 typed-data signatures.
+// signCapability and signManageCapability use the CapabilityKernel domain.
+// signIntent uses the CapabilityKernel domain with the Intent primary type.
+const capSig    = await signCapability(walletClient, capability, kernelAddress, chainId);
+const manageSig = await signManageCapability(walletClient, manageCap, registryAddress, chainId);
+const intentSig = await signIntent(walletClient, intent, kernelAddress, chainId);
 ```
 
 ### Adapter data encoding

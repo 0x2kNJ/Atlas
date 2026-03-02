@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// ─── SUPERSEDED ───────────────────────────────────────────────────────────────
+// This contract uses keccak256 for the rolling receipt hash chain.
+// The active production version is ReceiptAccumulatorSHA256.sol, which uses
+// sha256() to match the Binius64 compliance circuit in Binius/binius64-compliance/.
+//
+// This file is retained for reference and for tests that explicitly exercise the
+// keccak variant. Do not deploy this version — use ReceiptAccumulatorSHA256.sol.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IReceiptAccumulator} from "./interfaces/IReceiptAccumulator.sol";
 

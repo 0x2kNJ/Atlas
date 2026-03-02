@@ -1,6 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// ─── ALTERNATIVE ZK STACK (NOT DEPLOYED) ─────────────────────────────────────
+// This contract adapts the Noir / Barretenberg UltraHonk verifier to the
+// ICircuit1Verifier interface. It was the original compliance proof verifier
+// before the ZK stack was migrated to Binius64.
+//
+// Active production verifier: BiniusCircuit1Verifier.sol
+// Active prover:               Binius/binius64-compliance/ (Rust, ~173ms prove time)
+//
+// This file is retained for comparison and as a reference implementation of the
+// ICircuit1Verifier interface. The corresponding Noir circuit lives in circuits/circuit1/.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import { ICircuit1Verifier } from "../interfaces/ICircuit1Verifier.sol";
 
 interface IHonkVerifier {

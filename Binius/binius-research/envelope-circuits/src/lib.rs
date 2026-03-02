@@ -1,18 +1,14 @@
-// Binius64 Envelope Protocol Circuits — Research Implementation
+// Atlas Protocol — Binius m3 Envelope Circuits
 //
-// RESEARCH ONLY: This crate benchmarks binius64 proving times for envelope-equivalent
-// circuits. The Noir + UltraHonk implementation remains the primary production stack.
+// Ported from the legacy binius-frontend API to the current upstream binius_m3 API.
 //
-// Circuit design philosophy:
-//   - Uses SHA256 as the hash primitive (binius64 is optimized for this)
-//   - Production Noir circuits use Poseidon2 over BLS12-381 — the computational
-//     structure (Merkle paths, hash preimages, range checks) is equivalent for
-//     timing purposes; the hash function constant factor is similar
-//   - Fixed Merkle depth = 20 (matches SingletonVault commitment tree)
-//   - All circuits use the ExampleCircuit pattern for consistent benchmarking
+// The m3 API uses a table-based model:
+//   1. Define a ConstraintSystem
+//   2. Add tables with columns and gadgets
+//   3. Fill events (witness rows) into the table
+//   4. Compile, prove, verify
+//
+// Each SHA-256 "event" is a 512-bit message block ([u32; 16]).
+// The compliance circuit chains N SHA-256 compressions.
 
-pub mod common;
 pub mod compliance;
-pub mod encumber;
-pub mod settle;
-pub mod spend;

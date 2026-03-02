@@ -1,0 +1,32 @@
+[package]
+name = "binius64-compliance"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+binius-circuits = { path = "../binius64/crates/circuits" }
+binius-core = { path = "../binius64/crates/core" }
+binius-frontend = { path = "../binius64/crates/frontend" }
+binius-prover = { path = "../binius64/crates/prover", default-features = false }
+binius-verifier = { path = "../binius64/crates/verifier", default-features = false }
+binius-transcript = { path = "../binius64/crates/transcript" }
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+
+[dev-dependencies]
+hex-literal = "1"
+
+[features]
+default = ["rayon"]
+rayon = ["binius-prover/rayon", "binius-verifier/rayon"]
+
+[[bin]]
+name = "compliance-bench"
+path = "src/main.rs"
+
+[[bin]]
+name = "compliance-service"
+path = "src/service.rs"

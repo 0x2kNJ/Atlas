@@ -30,10 +30,20 @@ broadcast/
 *.swp
 *.swo
 
-# Env
+# Env — copy .env.example and fill in values
 .env
 .env.*
 !.env.example
 
 # Compiled circuit artifacts (large, regenerable)
 circuits/**/target/
+
+# WASM build output (regenerable via wasm-pack)
+Binius/binius-research/wasm-prover/pkg/*.wasm
+Binius/binius-research/wasm-prover/pkg/*.js
+Binius/binius-research/wasm-prover/pkg/*.d.ts
+!Binius/binius-research/wasm-prover/pkg/package.json
+
+# Binius EVM verifier build cache (regenerable via forge build)
+Binius/binius-research/evm-verifier/out/
+Binius/binius-research/evm-verifier/cache/

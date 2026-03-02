@@ -6,20 +6,21 @@ import {Script, console2} from "forge-std/Script.sol";
 import {SingletonVault}       from "../contracts/SingletonVault.sol";
 import {CapabilityKernel}     from "../contracts/CapabilityKernel.sol";
 import {EnvelopeRegistry}     from "../contracts/EnvelopeRegistry.sol";
-import {ReceiptAccumulator}   from "../contracts/ReceiptAccumulator.sol";
-import {CreditVerifier}       from "../contracts/CreditVerifier.sol";
+import {ReceiptAccumulatorSHA256} from "../contracts/ReceiptAccumulatorSHA256.sol";
+import {CreditVerifier}          from "../contracts/CreditVerifier.sol";
+import {BiniusCircuit1Verifier}  from "../contracts/verifiers/BiniusCircuit1Verifier.sol";
 import {ClawloanRepayAdapter} from "../contracts/adapters/ClawloanRepayAdapter.sol";
 import {DirectTransferAdapter} from "../contracts/adapters/DirectTransferAdapter.sol";
-import {PriceSwapAdapter}     from "../contracts/adapters/PriceSwapAdapter.sol";
-import {LiquidationAdapter}        from "../contracts/adapters/LiquidationAdapter.sol";
-import {MockReverseSwapAdapter}    from "../contracts/adapters/MockReverseSwapAdapter.sol";
-import {PoolPauseAdapter}          from "../contracts/adapters/PoolPauseAdapter.sol";
+import {PriceSwapAdapter}     from "../contracts/adapters/demo/PriceSwapAdapter.sol";
+import {LiquidationAdapter}        from "../contracts/adapters/demo/LiquidationAdapter.sol";
+import {MockReverseSwapAdapter}    from "../contracts/adapters/demo/MockReverseSwapAdapter.sol";
+import {PoolPauseAdapter}          from "../contracts/adapters/demo/PoolPauseAdapter.sol";
 import {UtilisationOracle}         from "../contracts/oracles/UtilisationOracle.sol";
 
 import {MockERC20}              from "../test/mocks/MockERC20.sol";
 import {MockClawloanPool}       from "../test/mocks/MockClawloanPool.sol";
 import {MockTimestampOracle}    from "../test/mocks/MockTimestampOracle.sol";
-import {MockCircuit1Verifier}   from "../test/mocks/MockCircuit1Verifier.sol";
+// MockCircuit1Verifier removed — using BiniusCircuit1Verifier with real proofs
 import {MockSubAgentHub}        from "../test/mocks/MockSubAgentHub.sol";
 import {MockPriceOracle}        from "../test/mocks/MockPriceOracle.sol";
 import {MockHealthOracle}       from "../test/mocks/MockHealthOracle.sol";
@@ -106,16 +107,21 @@ contract DeployClawloanDemo is Script {
         );
         console2.log("EnvelopeRegistry:    ", address(registry));
 
-        // ── Receipt accumulator + credit verifier ─────────────────────────────
-        ReceiptAccumulator accumulator = new ReceiptAccumulator(msg.sender);
-        console2.log("ReceiptAccumulator:  ", address(accumulator));
+        // ── Receipt accumulator (SHA-256) + Binius64 verifier ─────────────────
+        ReceiptAccumulatorSHA256 accumulator = new ReceiptAccumulatorSHA256(msg.sender);
+        console2.log("ReceiptAccumulatorSHA256:", address(accumulator));
 
-        MockCircuit1Verifier mockVerifier = new MockCircuit1Verifier();
-        console2.log("MockCircuit1Verifier:", address(mockVerifier));
+        // Anvil account 1 as the demo attester — signs proof attestations off-chain.
+        // The Binius64 prover generates proofs (~173ms), the attester verifies (~47ms)
+        // and signs, then the UI submits the attestation on-chain.
+        address attester = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+        BiniusCircuit1Verifier biniusVerifier = new BiniusCircuit1Verifier(msg.sender, attester);
+        console2.log("BiniusCircuit1Verifier:", address(biniusVerifier));
+        console2.log("  attester:           ", attester);
 
         CreditVerifier creditVerifier = new CreditVerifier(
             address(accumulator),
-            address(mockVerifier),
+            address(biniusVerifier),
             msg.sender
         );
         console2.log("CreditVerifier:      ", address(creditVerifier));
@@ -259,8 +265,8 @@ contract DeployClawloanDemo is Script {
         console2.log("SingletonVault:       ", address(vault));
         console2.log("CapabilityKernel:     ", address(kernel));
         console2.log("EnvelopeRegistry:     ", address(registry));
-        console2.log("ReceiptAccumulator:   ", address(accumulator));
-        console2.log("MockCircuit1Verifier: ", address(mockVerifier));
+        console2.log("ReceiptAccumulatorSHA256:", address(accumulator));
+        console2.log("BiniusCircuit1Verifier:", address(biniusVerifier));
         console2.log("CreditVerifier:       ", address(creditVerifier));
         console2.log("ClawloanRepayAdapter: ", address(repayAdapter));
         console2.log("--- Phase 2: Dead Man's Switch ---");
@@ -287,6 +293,8 @@ contract DeployClawloanDemo is Script {
         console2.log("MockReverseSwapAdapter:", address(reverseSwapAdapter));
         console2.log("");
         console2.log("=== Next Steps ===");
+        console2.log("0. Start proof server (required for ZK Credit Passport):");
+        console2.log("   cd ui && node proof-server.mjs");
         console2.log("1. Mint USDC to your operator address:");
         console2.log("   cast send <MockUSDC> 'mint(address,uint256)' <operator> 15000000 --private-key <pk>");
         console2.log("2. Approve vault for USDC:");
