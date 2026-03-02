@@ -115,38 +115,132 @@ SingletonVault
 
 All scenarios run on a local Anvil node. Start Anvil, deploy, run the UI.
 
-| URL | Scenario | What it demonstrates |
-|---|---|---|
-| `/` | **Clawloan Credit** | Liveness-independent repayment + ZK credit tier upgrade |
-| `/?scenario=dms` | **Dead Man's Switch** | Beneficiary-committed treasury failsafe |
-| `/?scenario=orchestration` | **Sub-agent Fleet** | Hierarchical budget isolation across 2 agents |
-| `/?role=keeper` | **Keeper Mode** | Third-party execution from a separate wallet tab |
-| `/?scenario=stoploss` | Stop-Loss | Price-triggered position exit |
-| `/?scenario=liquidation` | Liquidation | Keeper-triggered collateral seizure |
-| `/?scenario=sg-chained` | Chained Strategy | Multi-step strategy graph |
+| URL | Scenario |
+|---|---|
+| `/` | Clawloan Credit — borrow, repay, ZK credit tier upgrade |
+| `/?scenario=capital-provider` | Capital Provider — institutional lending with keeper guard |
+| `/?scenario=dms` | Dead Man's Switch — heartbeat-gated treasury failsafe |
+| `/?scenario=orchestration` | Sub-agent Fleet — hierarchical multi-agent budget isolation |
+| `/?role=keeper` | Keeper Mode — trigger envelopes from a separate wallet tab |
+| `/?scenario=stoploss` | Stop-Loss — price-triggered protective exit |
+| `/?scenario=liquidation` | Liquidation — keeper-triggered collateral seizure |
+| `/?scenario=sg-chained` | Chained Strategy — deterministic 2-stage price graph |
+| `/?scenario=sg-leveraged-long` | Leveraged Long — recursive sell-high / rebuy-low |
+| `/?scenario=sg-deleverage` | Degrade Ladder — 3-tranche graduated exit at price bands |
+| `/?scenario=sg-self-repaying` | Self-Repaying Loan — yield harvest auto-repays debt |
+| `/?scenario=sg-collateral-rotation` | Collateral Rotation — bi-directional WETH/USDC rebalancing |
+| `/?scenario=sg-refi` | Refinance Pipeline — liquidation shield + instant re-entry |
+| `/?scenario=sg-dca` | Leveraged DCA — 4-stage DCA cycle using borrowed capital |
 
-### Phase 1 — Clawloan Credit
+---
 
-1. Agent mints USDC (simulating task earnings)
-2. Borrows from Clawloan — unsecured, credit-based
-3. Deposits earnings into Atlas vault
-4. Signs repayment intent, registers envelope, **goes offline**
-5. Keeper triggers at deadline — loan repaid, surplus returned, receipt emitted
-6. Agent submits Binius64 ZK proof — credit tier upgraded from NEW → BRONZE
+### Clawloan Credit (`/`)
 
-### Phase 2 — Dead Man's Switch
+The primary scenario. An agent borrows unsecured USDC based on its Atlas credit
+identity, deposits task earnings as vault collateral, pre-signs repayment, and
+goes offline. A keeper triggers at the loan deadline.
 
-Agent pre-signs: "transfer $2,000 to DAO multisig if I miss a heartbeat for 24h."
-Periodically cancels and re-registers with a fresh deadline. If the agent goes
-dark, any keeper triggers the transfer. The beneficiary address is committed in
-the EIP-712 intent hash and cannot be redirected by an attacker.
+1. Agent earns 1,000 USDC (simulated via MockERC20.mint)
+2. Borrows 500 USDC from Clawloan — credit-based, no collateral
+3. Deposits earnings into Atlas vault as a hash-committed position
+4. Signs repayment intent + registers envelope — **goes offline**
+5. Keeper triggers at deadline: loan repaid, 0.1% fee kept, surplus returned
+6. Agent submits Binius64 ZK proof → credit tier upgrades NEW → BRONZE
 
-### Phase 3 — Sub-agent Fleet
+**Credit tiers:** NEW (0 repayments, $500 max) → BRONZE (1+, $2k) → SILVER (6+, $10k) → GOLD (21+, $50k) → PLATINUM (50+, $100k)
 
-Orchestrator deploys two sub-agents (Alpha: yield, Beta: arb) each with a
-$1,500 allocation from a $3,000 budget. Each runs an independent Clawloan
-credit cycle. `MockSubAgentHub` enforces per-agent budget caps at the
-application layer (Phase 2 will enforce via `parentCapabilityHash` on-chain).
+---
+
+### Capital Provider (`/?scenario=capital-provider`)
+
+The lender's perspective. Demonstrates that Atlas gives capital providers
+enforceable guarantees, not just trust in the borrower.
+
+1. Lender funds pool with 100,000 USDC
+2. Configures risk policy: utilisation guard threshold + per-tier borrow limits
+3. Verifier assigns borrower a ZK Credit Passport (Tier 2 within policy)
+4. Agent draws 45,000 USDC loan (45% utilisation)
+5. Lender registers a `PoolPauseAdapter` envelope: if utilisation > guard threshold,
+   any keeper fires it to halt new borrowing — lender doesn't need to be online
+6. Agent repays + interest; lender claims 5% APY yield
+
+**What this proves:** capital providers can define and enforce utilisation policy
+on-chain without an intermediary. The pause is cryptographically pre-committed,
+not a manual intervention.
+
+---
+
+### Dead Man's Switch (`/?scenario=dms`)
+
+Agent manages a 2,000 USDC DAO treasury. Pre-signs: "if I miss a heartbeat for
+24 hours, transfer all funds to the DAO multisig." Periodically cancels and
+re-registers with a fresh deadline (the heartbeat). If it goes dark, any keeper
+triggers the transfer.
+
+The beneficiary is committed in the EIP-712 intent hash — an attacker who
+steals the agent key can only execute the pre-signed intent, which sends funds
+to the DAO, not the attacker.
+
+---
+
+### Sub-agent Fleet (`/?scenario=orchestration`)
+
+Orchestrator deploys two sub-agents (Alpha: yield-farming, Beta: arbitrage),
+each allocated 1,500 USDC from a 3,000 USDC budget. Each runs its own
+independent Clawloan credit cycle with isolated credit history.
+`MockSubAgentHub` enforces per-agent budget caps and aggregates P&L.
+
+---
+
+### Strategy Graphs (`/?scenario=sg-*`)
+
+Strategy graphs demonstrate that Atlas can pre-commit **entire multi-stage
+autonomous strategies** in a single signing session. The output position of
+each stage is deterministic — `salt = keccak256(abi.encode(nullifier, "output"))`
+— so the agent can sign Stage 2 referencing Stage 1's output *before Stage 1
+has fired*. This is structurally impossible with session keys.
+
+**Chained Strategy (`sg-chained`)** — The canonical two-stage graph.
+- Stage 1: ETH/USD < $1,800 → sell 1 WETH → USDC (protective exit)
+- Stage 2: ETH/USD > $1,200 → rebuy WETH with USDC (re-entry at lower price)
+
+Both signed once. No agent online at either trigger.
+
+**Leveraged Long (`sg-leveraged-long`)** — Sell high, rebuy low, net WETH gain.
+- Stage 1: ETH < $2,000 → sell 1 WETH → 2,000 USDC
+- Stage 2: ETH > $1,200 → rebuy at $1,400 → ~1.43 WETH
+- Net: +43% WETH exposure from a single pre-committed session.
+
+**Degrade Ladder (`sg-deleverage`)** — Fan-out: 3 independent exit envelopes registered simultaneously, each covering one tranche.
+- Envelope A: ETH < $2,000 → sell 0.33 WETH
+- Envelope B: ETH < $1,600 → sell 0.33 WETH
+- Envelope C: ETH < $1,200 → sell 0.34 WETH (full exit)
+
+**Self-Repaying Loan (`sg-self-repaying`)** — Yield harvest auto-repays debt.
+- Stage 1: Borrow 500 USDC (credit-gated, off-envelope)
+- Stage 2: ETH > $2,800 → harvest yield: sell 0.3 WETH → 840 USDC
+- Stage 3: Chained — 840 USDC → rebuy WETH (closes the cycle)
+- Loan repayment is funded by yield. Agent signs all three stages before going offline.
+
+**Collateral Rotation (`sg-collateral-rotation`)** — Infinite rebalancing loop.
+- Stage 1: ETH < $1,800 → rotate WETH → USDC vault position (de-risk)
+- Stage 2: ETH > $2,200 → rotate USDC → WETH vault position (re-risk)
+- Stage 2's input = Stage 1's deterministic output. Both signed before either fires.
+- Two keepers service the loop indefinitely. No agent required.
+
+**Refinance Pipeline (`sg-refi`)** — Liquidation shield with instant re-entry.
+- Stage 1: ETH < $1,500 (LTV stress) → emergency exit: sell WETH → USDC
+- Stage 2: ETH > $1,200 → re-open at safer LTV: buy WETH back with a portion of USDC
+- The refinance executes *instantly* after the liquidation exit — no idle capital
+  waiting for an agent to come back online.
+
+**Leveraged DCA (`sg-dca`)** — Borrow, deploy on dip, repay from recovery.
+- Stage 1: Borrow 1,000 USDC (credit-gated)
+- Stage 2: ETH < $1,600 → buy WETH dip (1,000 USDC → 0.714 WETH at $1,400)
+- Stage 3: ETH > $2,400 → sell on recovery (0.714 WETH → 1,714 USDC)
+- Stage 4: Repay 1,000 USDC loan — keep 714 USDC profit (71.4% return on borrowed capital)
+
+Stages 2–3–4 are a chain. The agent signs all of them before Stage 1 fires.
 
 ---
 
