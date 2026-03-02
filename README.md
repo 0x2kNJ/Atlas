@@ -11,12 +11,47 @@ deterministic, bounded, non-replayable execution. Nothing else does.**
 
 ## The Problem
 
+**AI agents executing financial operations on-chain face three structural problems today.**
+
+**1. No liveness-independent execution.** Agents must be online at the moment an action
+should fire — a stop-loss at 3am, a loan repayment at deadline, a treasury transfer on
+a trigger condition. If the agent is down, rate-limited, or compromised, the action
+doesn't happen. Signing session keys and handing them to keepers extends the problem
+rather than solving it: the key grants unrestricted spend within the session scope.
+
+**2. Uncollateralised lending has no effective enforcement path.**
+Traditional undercollateralised lending relies on legal recourse or reputation systems
+that don't exist on-chain for autonomous agents. Lenders have no mechanism to:
+- define who qualifies before capital is deployed (credit gatekeeping)
+- cap how much a borrower can draw based on a verified risk tier
+- enforce utilisation thresholds without being online to monitor them
+- pre-commit automatic remediation (pool pause, collateral seizure) to a keeper
+
+The agent on the other side cannot prove creditworthiness without revealing its
+full transaction history to the lender, and cannot pre-commit complex multi-step
+repayment strategies (borrow → yield → repay) that span time without remaining
+online for the duration.
+
+**3. Agent key compromise is catastrophic.** There is no scoped delegation model.
+If an agent key is leaked, every asset the agent controls within that session is at risk.
+Multi-agent systems (orchestrators spinning up sub-agents) have no way to enforce
+budget hierarchies — a sub-agent can act on any permission the parent holds.
+
+---
+
+**Atlas resolves all three:**
+
 | Scenario | Without Atlas | With Atlas |
 |---|---|---|
-| Agent goes offline at 3am | Position unmanaged | Envelope triggers via any keeper |
-| Agent key compromised | Everything within session scope drained | Capability `maxSpendPerPeriod` caps loss to the period limit |
-| Multi-agent delegation | Multiple accounts, no constraint inheritance | Sub-capabilities verified as strict subset of parent |
-| Prove compliance without revealing trades | Not possible | ZK receipt chain → on-chain credit tier upgrade |
+| Agent goes offline at 3am | Position unmanaged, trigger missed | Envelope fires via any permissionless keeper |
+| Agent key compromised | Full session scope drained | `maxSpendPerPeriod` hard-caps loss to the rate limit |
+| Lender needs to enforce utilisation policy | Manual monitoring or custodial control | `PoolPauseAdapter` envelope pre-committed; keeper fires on oracle breach |
+| Borrower draws without proving creditworthiness | Lender takes it on faith | ZK Credit Passport gates borrow limit by on-chain verified tier |
+| P2P lender sets policy for multiple borrowers | Off-chain terms, no enforcement | Per-capability constraints inherited by each borrower's capability |
+| Complex repayment: borrow → yield → repay | Agent must stay online for entire duration | Full multi-stage strategy pre-committed in one signing session |
+| Multi-agent delegation | Multiple accounts, no constraint inheritance | Sub-capabilities verified on-chain as strict subsets of parent |
+| Prove compliance without revealing trades | Not possible | ZK receipt chain → credit tier upgrade, no trade data exposed |
+| Agent tries to redirect a pre-committed transfer | Possible if key is stolen | Beneficiary is committed in the EIP-712 hash — key theft can only execute the original intent |
 
 ---
 
