@@ -1,0 +1,26 @@
+[workspace]
+members = ["envelope-circuits", "wasm-prover"]
+resolver = "2"
+
+[workspace.dependencies]
+# Binius64 — full-featured (rayon + CLMUL enabled, NOT the SP1-patched version)
+binius-core       = { path = "/tmp/binius64-patched/crates/core" }
+binius-circuits   = { path = "/tmp/binius64-patched/crates/circuits" }
+binius-examples   = { path = "/tmp/binius64-patched/crates/examples" }
+binius-frontend   = { path = "/tmp/binius64-patched/crates/frontend" }
+binius-prover     = { path = "/tmp/binius64-patched/crates/prover" }
+binius-verifier   = { path = "/tmp/binius64-patched/crates/verifier" }
+binius-hash       = { path = "/tmp/binius64-patched/crates/hash" }
+binius-transcript = { path = "/tmp/binius64-patched/crates/transcript" }
+binius-utils      = { path = "/tmp/binius64-patched/crates/utils" }
+
+binius-field      = { path = "/tmp/binius64-patched/crates/field" }
+binius-math       = { path = "/tmp/binius64-patched/crates/math" }
+binius-ip         = { path = "/tmp/binius64-patched/crates/ip" }
+itertools         = "0.13"
+
+anyhow  = "1"
+sha2    = "0.10"
+digest  = "0.10"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }

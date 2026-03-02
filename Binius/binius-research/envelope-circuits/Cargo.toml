@@ -1,0 +1,76 @@
+[package]
+name = "envelope-circuits"
+version = "0.1.0"
+edition = "2021"
+
+# RESEARCH ONLY — Binius64 implementations of Envelope Protocol circuits.
+# This crate is for benchmarking real binius64 proving times.
+# The Noir + UltraHonk implementation remains the primary production implementation.
+#
+# Circuits implemented:
+#   - Encumber: prove note ownership + Merkle membership + nullifier + LTV range check
+#   - Spend:    prove note ownership + nullifier + output commitment + conservation
+#   - Settle:   prove note ownership + lender confirmation + settlement outputs
+
+[dependencies]
+binius-core       = { workspace = true }
+binius-circuits   = { workspace = true }
+binius-frontend   = { workspace = true }
+binius-hash       = { workspace = true }
+binius-transcript = { workspace = true }
+binius-utils      = { workspace = true }
+binius-field      = { workspace = true }
+binius-math       = { workspace = true }
+binius-ip         = { workspace = true }
+itertools         = { workspace = true }
+
+# Optional — only needed by the native binary targets (bench, export-*, run-trace).
+# The library itself (encumber/spend/settle circuits) has no dependency on these.
+# The WASM prover omits the "native" feature to avoid pulling in ureq/ring/ethsign.
+binius-examples   = { workspace = true, optional = true }
+binius-prover     = { workspace = true, optional = true }
+binius-verifier   = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
+
+anyhow             = { workspace = true }
+sha2               = { workspace = true }
+digest             = { workspace = true }
+tracing            = { workspace = true }
+hex                = "0.4"
+bytes              = "1"
+
+[features]
+default = ["native"]
+native  = ["dep:binius-examples", "dep:binius-prover", "dep:binius-verifier", "dep:tracing-subscriber"]
+
+[[bin]]
+name  = "bench"
+path  = "src/bench.rs"
+
+[[bin]]
+name  = "export-proof"
+path  = "src/export_proof.rs"
+
+[[bin]]
+name  = "export-transcript-vectors"
+path  = "src/export_transcript_vectors.rs"
+
+[[bin]]
+name  = "export-verifier-trace"
+path  = "src/export_verifier_trace.rs"
+
+[[bin]]
+name  = "export-verifier-full-trace"
+path  = "src/export_verifier_full_trace.rs"
+
+[[bin]]
+name  = "run-trace"
+path  = "src/run_trace.rs"
+
+[[bin]]
+name = "print-iv"
+path = "src/print_iv.rs"
+
+[[bin]]
+name = "export-twiddle-basis"
+path = "src/export_twiddle_basis.rs"

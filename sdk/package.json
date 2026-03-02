@@ -1,0 +1,34 @@
+{
+  "name": "@atlas-protocol/sdk",
+  "version": "0.1.0",
+  "description": "Atlas Protocol — TypeScript SDK for capability creation, intent signing, and envelope construction",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "viem": "^2.46.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@viem/anvil": "^0.0.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,18 @@
+# WASM build configuration for binius-wasm-prover
+#
+# ── SIMD128 status ────────────────────────────────────────────────────────────
+# binius-field has a wasm32 SIMD128 module (arch/wasm32/m128.rs, packed_ghash_128.rs)
+# that wraps v128 intrinsics. However the upstream library's wasm32 SIMD path is
+# currently incomplete: the packed subfield types (BinaryField1b over M128) are missing
+# trait implementations required by the prover.
+#
+# When Irreducible ships a complete wasm32 SIMD build, simply uncomment:
+#   rustflags = ["-C", "target-feature=+simd128"]
+# Expected speedup: ~3-5x on GF(2^128), bringing browser times from ~15-25s to ~5-8s.
+#
+# SIMD128 browser coverage when ready:
+#   Chrome 91+ (May 2021), Firefox 89+, Safari 16.4+, iOS 16.4+, Chrome Android 91+
+# ──────────────────────────────────────────────────────────────────────────────
+
+# [target.wasm32-unknown-unknown]
+# rustflags = ["-C", "target-feature=+simd128"]

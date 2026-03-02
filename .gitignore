@@ -1,0 +1,39 @@
+# Build artifacts
+target/
+out/
+cache/
+broadcast/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# Rust
+**/*.rs.bk
+Cargo.lock
+
+# Foundry
+cache/
+out/
+broadcast/
+*.lock
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Compiled circuit artifacts (large, regenerable)
+circuits/**/target/

@@ -1,0 +1,9 @@
+[package]
+name = "binius64-sp1-common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde            = { workspace = true }
+alloy-sol-types  = { workspace = true }
+alloy-primitives = { workspace = true }

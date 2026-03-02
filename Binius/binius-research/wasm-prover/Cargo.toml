@@ -1,0 +1,47 @@
+[package]
+name = "binius-wasm-prover"
+version = "0.1.0"
+edition = "2021"
+description = "Browser-side Binius64 prover for Envelope Protocol circuits (WASM)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# ── WASM-specific: we never enable the rayon feature ─────────────────────────
+# The binius crates use a "maybe-rayon" shim in binius-utils: when rayon is off
+# all parallel iterators degrade gracefully to sequential iterators. This is the
+# only knob needed to make the prover single-threaded for wasm32.
+# ──────────────────────────────────────────────────────────────────────────────
+
+[dependencies]
+# wasm-bindgen plumbing
+wasm-bindgen     = "0.2"
+js-sys           = "0.3"
+serde            = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+
+# getrandom must opt-in to the JS entropy source for wasm32
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+# Binius crates — default-features = false everywhere to strip rayon
+binius-core       = { path = "/tmp/binius64-patched/crates/core" }
+binius-field      = { path = "/tmp/binius64-patched/crates/field" }
+binius-math       = { path = "/tmp/binius64-patched/crates/math" }
+binius-frontend   = { path = "/tmp/binius64-patched/crates/frontend" }
+binius-circuits   = { path = "/tmp/binius64-patched/crates/circuits" }
+binius-hash       = { path = "/tmp/binius64-patched/crates/hash",     default-features = false }
+binius-prover     = { path = "/tmp/binius64-patched/crates/prover",   default-features = false }
+binius-verifier   = { path = "/tmp/binius64-patched/crates/verifier", default-features = false }
+binius-transcript = { path = "/tmp/binius64-patched/crates/transcript" }
+binius-utils      = { path = "/tmp/binius64-patched/crates/utils" }
+
+# The envelope circuits crate — disable the "native" feature so binius-examples
+# (which pulls in ureq/ring/ethsign) is not compiled for WASM.
+envelope-circuits = { path = "../envelope-circuits", default-features = false }
+
+anyhow  = "1"
+sha2    = "0.10"
+hex     = "0.4"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

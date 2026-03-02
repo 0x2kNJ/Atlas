@@ -1,0 +1,27 @@
+[package]
+name = "binius64-sp1-script"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp1-sdk               = { workspace = true }
+binius64-sp1-common   = { path = "../common" }
+binius-core           = { workspace = true }
+binius-utils          = { workspace = true }
+binius-verifier       = { workspace = true }
+binius-hash           = { workspace = true }
+binius-transcript     = { workspace = true }
+serde                 = { workspace = true }
+serde_json            = { workspace = true }
+anyhow                = { workspace = true }
+clap                  = { workspace = true }
+tokio                 = { workspace = true }
+hex                   = { workspace = true }
+
+[[bin]]
+name = "prove"
+path = "src/prove.rs"
+
+[[bin]]
+name = "verify-offchain"
+path = "src/verify.rs"

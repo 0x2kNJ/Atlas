@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Binius64 Browser Prover — Envelope Protocol</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      background: #0d0d0f;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    header {
+      border-bottom: 1px solid #2d3748;
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: #f7fafc;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      font-size: 0.8rem;
+      color: #718096;
+      margin-top: 0.4rem;
+      font-family: system-ui, sans-serif;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #1a202c;
+      border: 1px solid #2d3748;
+      border-radius: 4px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.7rem;
+      color: #68d391;
+      margin-top: 0.5rem;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: #141417;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 1.5rem;
+    }
+
+    .card h2 {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #90cdf4;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    label {
+      display: block;
+      font-size: 0.72rem;
+      color: #a0aec0;
+      margin-bottom: 0.25rem;
+      margin-top: 0.75rem;
+    }
+
+    label:first-of-type { margin-top: 0; }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      background: #1a1a1f;
+      border: 1px solid #2d3748;
+      border-radius: 4px;
+      padding: 0.4rem 0.6rem;
+      color: #e2e8f0;
+      font-family: inherit;
+      font-size: 0.75rem;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #4299e1;
+    }
+
+    button {
+      margin-top: 1.25rem;
+      width: 100%;
+      padding: 0.6rem;
+      background: #2b6cb0;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-family: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #2c7ad6; }
+    button:disabled { background: #2d3748; color: #718096; cursor: not-allowed; }
+
+    .result {
+      margin-top: 1rem;
+      background: #0d1117;
+      border: 1px solid #2d3748;
+      border-radius: 5px;
+      padding: 0.75rem;
+      font-size: 0.7rem;
+      min-height: 4rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #68d391;
+      line-height: 1.5;
+    }
+
+    .result.error { color: #fc8181; }
+    .result.pending { color: #f6ad55; }
+
+    .stats {
+      margin-top: 0.5rem;
+      display: flex;
+      gap: 1rem;
+      font-size: 0.7rem;
+      color: #718096;
+    }
+
+    .stats span { color: #90cdf4; }
+
+    #status-bar {
+      background: #1a1a1f;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      padding: 0.6rem 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.75rem;
+      color: #a0aec0;
+    }
+
+    #status-bar .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fc8181;
+      margin-right: 0.5rem;
+      vertical-align: middle;
+    }
+
+    #status-bar.ready .dot { background: #68d391; }
+    #status-bar.loading .dot {
+      background: #f6ad55;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Binius64 Browser Prover</h1>
+    <p>First-ever client-side Binius IOP proof generation — Envelope Protocol circuits running natively in WebAssembly.</p>
+    <div class="badge">wasm32-unknown-unknown · SHA256 Merkle · GF(2¹²⁸) arithmetic · FRI commitment</div>
+  </header>
+
+  <div id="status-bar" class="loading">
+    <span class="dot"></span>
+    Initializing Binius64 WASM prover...
+  </div>
+
+  <div class="grid">
+
+    <!-- Encumber -->
+    <div class="card">
+      <h2>⊕ Encumber</h2>
+      <p style="font-size:0.72rem;color:#718096;font-family:system-ui,sans-serif;margin-bottom:1rem">
+        Prove note ownership + Merkle membership + collateral sufficiency (note_value ≥ collateral_amount).
+      </p>
+
+      <label>note_value (u64)</label>
+      <input id="enc-note-value" type="number" value="100000000" />
+
+      <label>note_rand (32 bytes hex)</label>
+      <input id="enc-note-rand" type="text" value="0x4242424242424242424242424242424242424242424242424242424242424242" />
+
+      <label>owner_pk (32 bytes hex)</label>
+      <input id="enc-owner-pk" type="text" value="0x1111111111111111111111111111111111111111111111111111111111111111" />
+
+      <label>collateral_amount (u64)</label>
+      <input id="enc-collateral" type="number" value="75000000" />
+
+      <label>log_inv_rate (1=½ rate ~265KB, 2=¼ rate ~180KB)</label>
+      <input id="enc-rate" type="number" value="1" min="0" max="3" />
+
+      <button id="enc-btn" disabled>Generate Encumber Proof</button>
+      <div class="stats" id="enc-stats"></div>
+      <div class="result" id="enc-result">Waiting for WASM init...</div>
+    </div>
+
+    <!-- Spend -->
+    <div class="card">
+      <h2>→ Spend</h2>
+      <p style="font-size:0.72rem;color:#718096;font-family:system-ui,sans-serif;margin-bottom:1rem">
+        Prove note ownership + nullifier + output commitment + value conservation.
+      </p>
+
+      <label>in_value (u64)</label>
+      <input id="sp-in-value" type="number" value="100000000" />
+
+      <label>in_rand (32 bytes hex)</label>
+      <input id="sp-in-rand" type="text" value="0x4242424242424242424242424242424242424242424242424242424242424242" />
+
+      <label>in_pk (32 bytes hex)</label>
+      <input id="sp-in-pk" type="text" value="0x1111111111111111111111111111111111111111111111111111111111111111" />
+
+      <label>out_value (u64, ≤ in_value)</label>
+      <input id="sp-out-value" type="number" value="95000000" />
+
+      <label>out_rand (32 bytes hex)</label>
+      <input id="sp-out-rand" type="text" value="0xababababababababababababababababababababababababababababababababababab".slice(0,66) />
+
+      <label>out_pk (32 bytes hex)</label>
+      <input id="sp-out-pk" type="text" value="0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd" />
+
+      <label>log_inv_rate</label>
+      <input id="sp-rate" type="number" value="1" min="0" max="3" />
+
+      <button id="sp-btn" disabled>Generate Spend Proof</button>
+      <div class="stats" id="sp-stats"></div>
+      <div class="result" id="sp-result">Waiting for WASM init...</div>
+    </div>
+
+    <!-- Settle -->
+    <div class="card">
+      <h2>✓ Settle</h2>
+      <p style="font-size:0.72rem;color:#718096;font-family:system-ui,sans-serif;margin-bottom:1rem">
+        Prove loan settlement: note ownership + lender confirmation + output conservation.
+      </p>
+
+      <label>in_value (u64)</label>
+      <input id="se-in-value" type="number" value="100000000" />
+
+      <label>in_rand (32 bytes hex)</label>
+      <input id="se-in-rand" type="text" value="0x4242424242424242424242424242424242424242424242424242424242424242" />
+
+      <label>in_pk (32 bytes hex)</label>
+      <input id="se-in-pk" type="text" value="0x1111111111111111111111111111111111111111111111111111111111111111" />
+
+      <label>out_value (u64, ≤ in_value)</label>
+      <input id="se-out-value" type="number" value="90000000" />
+
+      <label>out_rand (32 bytes hex)</label>
+      <input id="se-out-rand" type="text" value="0xefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef".slice(0,66) />
+
+      <label>out_pk (32 bytes hex)</label>
+      <input id="se-out-pk" type="text" value="0xfefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe".slice(0,66) />
+
+      <label>log_inv_rate</label>
+      <input id="se-rate" type="number" value="1" min="0" max="3" />
+
+      <button id="se-btn" disabled>Generate Settle Proof</button>
+      <div class="stats" id="se-stats"></div>
+      <div class="result" id="se-result">Waiting for WASM init...</div>
+    </div>
+
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

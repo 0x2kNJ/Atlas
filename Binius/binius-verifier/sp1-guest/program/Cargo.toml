@@ -1,0 +1,27 @@
+[package]
+name = "binius64-sp1-program"
+version = "0.1.0"
+edition = "2021"
+
+# Compiles to RISC-V (SP1 zkVM target).
+# Build with: cd program && cargo prove build
+
+[dependencies]
+sp1-zkvm            = { workspace = true }
+binius64-sp1-common = { path = "../common" }
+
+# Real binius verifier — rayon disabled so it runs single-threaded in RISC-V
+binius-core       = { workspace = true }
+binius-verifier   = { workspace = true }
+binius-hash       = { workspace = true }
+binius-iop        = { workspace = true }
+binius-utils      = { workspace = true }
+binius-transcript = { workspace = true }
+
+alloy-primitives = { workspace = true }
+sha2   = { workspace = true }
+digest = { workspace = true }
+
+[[bin]]
+name = "binius64-sp1-program"
+path = "src/main.rs"

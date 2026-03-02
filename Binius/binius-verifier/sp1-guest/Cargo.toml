@@ -1,0 +1,30 @@
+[workspace]
+members = ["common", "program", "script"]
+resolver = "2"
+
+[workspace.dependencies]
+sp1-zkvm = "6.0.2"
+sp1-sdk  = "6.0.2"
+
+# Local patched copy of binius (fixes RISC-V M128 name conflict for SP1 guest)
+binius-core       = { path = "/tmp/binius64-patched/crates/core",       default-features = false }
+binius-verifier   = { path = "/tmp/binius64-patched/crates/verifier",   default-features = false }
+binius-hash       = { path = "/tmp/binius64-patched/crates/hash",       default-features = false }
+binius-iop        = { path = "/tmp/binius64-patched/crates/iop",        default-features = false }
+binius-utils      = { path = "/tmp/binius64-patched/crates/utils",      default-features = false }
+binius-transcript = { path = "/tmp/binius64-patched/crates/transcript", default-features = false }
+
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode    = "1"
+
+alloy-sol-types  = "0.7"
+alloy-primitives = { version = "0.7", features = ["serde"] }
+
+clap   = { version = "4", features = ["derive"] }
+tokio  = { version = "1", features = ["full"] }
+hex    = "0.4"
+anyhow = "1"
+
+sha2 = "0.10"
+digest = "0.10"
