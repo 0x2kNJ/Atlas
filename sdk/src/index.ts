@@ -76,20 +76,10 @@ export {
 
 export type { FeeTier } from "./adapters.js";
 
-// Binius64 prover
-export {
-  generateComplianceProof,
-} from "./prover.js";
-
-export type {
-  ReceiptInput,
-  ProverRequest,
-  ProverResult,
-  ProverError,
-  ProverResponse,
-} from "./prover.js";
-
 // Binius64 proof attestation
+// Note: the prover (prover.ts) uses node:child_process and is Node-only.
+// It is not exported here to keep the SDK browser-safe. Import it directly
+// in server-side code: import { generateComplianceProof } from "@atlas-protocol/sdk/prover"
 export {
   attestationHash,
   signAttestation,
